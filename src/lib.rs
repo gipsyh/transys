@@ -4,7 +4,7 @@ use minisat::SimpSolver;
 use satif::Satif;
 use std::collections::{HashMap, HashSet};
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Model {
     pub inputs: Vec<Var>,
     pub latchs: Vec<Var>,
