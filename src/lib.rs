@@ -2,7 +2,11 @@ use aig::Aig;
 use logic_form::{Clause, Cnf, Cube, Lit, LitMap, Var, VarMap};
 use minisat::SimpSolver;
 use satif::Satif;
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    ffi::{c_char, c_void, CStr},
+    mem::forget,
+};
 
 #[derive(Clone, Default)]
 pub struct Transys {
@@ -198,6 +202,20 @@ impl Transys {
 }
 
 #[no_mangle]
-pub extern "C" fn add_one(x: i32) -> i32 {
-    x + 1
+pub extern "C" fn transys_from_aig(aig: *const c_char) -> *mut c_void {
+    assert!(!aig.is_null());
+    let aig = unsafe {
+        let aig = CStr::from_ptr(aig);
+        aig.to_string_lossy().into_owned()
+    };
+    let transys = Box::new(Transys::from_aig(&Aig::from_file(aig).unwrap()));
+    let ptr = transys.as_ref() as *const Transys as *mut c_void;
+    forget(transys);
+    ptr
+}
+
+#[no_mangle]
+pub extern "C" fn drop_transys(transys: *mut c_void) {
+    let transys: Box<Transys> = unsafe { Box::from_raw(transys as *mut _) };
+    drop(transys)
 }
