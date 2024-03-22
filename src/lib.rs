@@ -5,7 +5,7 @@ use satif::Satif;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Default)]
-pub struct Model {
+pub struct Transys {
     pub inputs: Vec<Var>,
     pub latchs: Vec<Var>,
     pub primes: Vec<Lit>,
@@ -20,7 +20,7 @@ pub struct Model {
     pub max_latch: Var,
 }
 
-impl Model {
+impl Transys {
     fn compress_deps_rec(
         v: Var,
         deps: &mut VarMap<Vec<Var>>,
@@ -164,14 +164,15 @@ impl Model {
     }
 
     #[inline]
-    pub fn cube_next(&self, cube: &Cube) -> Cube {
+    pub fn cube_next(&self, cube: &[Lit]) -> Cube {
         cube.iter().map(|l| self.lit_next(*l)).collect()
     }
 
-    pub fn cube_subsume_init(&self, x: &Cube) -> bool {
-        for i in 0..x.len() {
-            if let Some(init) = self.init_map.get(&x[i].var()) {
-                if *init != x[i].polarity() {
+    #[inline]
+    pub fn cube_subsume_init(&self, x: &[Lit]) -> bool {
+        for x in x {
+            if let Some(init) = self.init_map.get(&x.var()) {
+                if *init != x.polarity() {
                     return false;
                 }
             }
@@ -194,4 +195,9 @@ impl Model {
             .map(|(latch, init)| Cube::from([Lit::new(*latch, !init)]))
             .collect()
     }
+}
+
+#[no_mangle]
+pub extern "C" fn add_one(x: i32) -> i32 {
+    x + 1
 }

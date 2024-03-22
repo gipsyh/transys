@@ -3,6 +3,10 @@ name = "transys"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "transys"
+crate-type = ["staticlib"]
+
 [dependencies]
 aig = { path = "../aig-rs" }
 minisat = { path = "../minisat-rs" }
