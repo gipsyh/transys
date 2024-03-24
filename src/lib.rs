@@ -4,8 +4,8 @@ use minisat::SimpSolver;
 use satif::Satif;
 use std::{
     collections::{HashMap, HashSet},
-    ffi::{c_char, c_void, CStr},
-    mem::forget,
+    ffi::{c_char, c_uint, c_void, CStr},
+    mem::{forget, transmute},
 };
 
 #[derive(Clone, Default)]
@@ -218,4 +218,10 @@ pub extern "C" fn transys_from_aig(aig: *const c_char) -> *mut c_void {
 pub extern "C" fn drop_transys(transys: *mut c_void) {
     let transys: Box<Transys> = unsafe { Box::from_raw(transys as *mut _) };
     drop(transys)
+}
+
+#[no_mangle]
+pub extern "C" fn lit_next(transys: *mut c_void, lit: c_uint) -> c_uint {
+    let transys = unsafe { &mut *(transys as *mut Transys) };
+    unsafe { transmute(transys.lit_next(transmute(lit))) }
 }

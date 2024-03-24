@@ -1,8 +1,12 @@
 #ifndef _PIC3_H_
 #define _PIC3_H_
 #include <stdio.h>
-extern "C" void *transys_from_aig(const char *);
-extern "C" void drop_transys(void *);
+
+extern "C" {
+void *transys_from_aig(const char *);
+
+void drop_transys(void *);
+}
 
 class Transys {
     public:
