@@ -1,9 +1,13 @@
 #pragma once
 
+#include <vector>
+
 extern "C" {
 void *transys_from_aig(const char *);
 
-void drop_transys(void *);
+void transys_drop(void *);
+
+int transys_cube_subsume_init(void *, uint *, uint);
 }
 
 class Transys {
@@ -15,9 +19,13 @@ class Transys {
 
 	~Transys()
 	{
-		drop_transys(ptr);
+		transys_drop(ptr);
 	}
 
-    private:
+	bool cube_subsume_init(std::vector<uint> cube)
+	{
+		return transys_cube_subsume_init(ptr, cube.data(), cube.size()) == 1;
+	}
+
 	void *ptr;
 };
