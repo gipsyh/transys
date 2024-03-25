@@ -1,6 +1,4 @@
-#ifndef _PIC3_H_
-#define _PIC3_H_
-#include <stdio.h>
+#pragma once
 
 extern "C" {
 void *transys_from_aig(const char *);
@@ -23,4 +21,3 @@ class Transys {
     private:
 	void *ptr;
 };
-#endif
