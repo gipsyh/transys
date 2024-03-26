@@ -3,8 +3,8 @@ use logic_form::{Clause, Cnf, Cube, Lit, LitMap, Var, VarMap};
 use minisat::SimpSolver;
 use std::{
     collections::{HashMap, HashSet},
-    ffi::{c_char, c_int, c_void, CStr},
-    mem::forget,
+    ffi::{c_char, c_int, c_uint, c_void, CStr},
+    mem::{forget, transmute},
     slice::from_raw_parts,
     usize,
 };
@@ -222,4 +222,10 @@ pub extern "C" fn transys_cube_subsume_init(
     let transys = unsafe { &*(transys as *const Transys) };
     let cube = unsafe { from_raw_parts(lit_ptr, lit_len as _) };
     transys.cube_subsume_init(cube) as c_int
+}
+
+#[no_mangle]
+pub extern "C" fn transys_lit_next(transys: *mut c_void, lit: c_uint) -> c_uint {
+    let transys = unsafe { &*(transys as *const Transys) };
+    unsafe { transmute(transys.lit_next(transmute(lit))) }
 }
