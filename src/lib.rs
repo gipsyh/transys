@@ -1,11 +1,10 @@
 use aig::Aig;
 use logic_form::{Clause, Cnf, Cube, Lit, LitMap, Var, VarMap};
 use minisat::SimpSolver;
-use satif::Satif;
 use std::{
     collections::{HashMap, HashSet},
-    ffi::{c_char, c_int, c_uint, c_void, CStr},
-    mem::{forget, transmute},
+    ffi::{c_char, c_int, c_void, CStr},
+    mem::forget,
     slice::from_raw_parts,
     usize,
 };
@@ -186,15 +185,7 @@ impl Transys {
         true
     }
 
-    pub fn load_trans(&self, solver: &mut minisat::Solver) {
-        while solver.num_var() < self.num_var {
-            solver.new_var();
-        }
-        for cls in self.trans.iter() {
-            solver.add_clause(cls)
-        }
-    }
-
+    #[inline]
     pub fn inits(&self) -> Vec<Cube> {
         self.init_map
             .iter()
@@ -220,12 +211,6 @@ pub extern "C" fn transys_from_aig(aig: *const c_char) -> *mut c_void {
 pub extern "C" fn transys_drop(transys: *mut c_void) {
     let transys: Box<Transys> = unsafe { Box::from_raw(transys as *mut _) };
     drop(transys)
-}
-
-#[no_mangle]
-pub extern "C" fn transys_lit_next(transys: *mut c_void, lit: c_uint) -> c_uint {
-    let transys = unsafe { &mut *(transys as *mut Transys) };
-    unsafe { transmute(transys.lit_next(transmute(lit))) }
 }
 
 #[no_mangle]

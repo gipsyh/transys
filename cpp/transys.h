@@ -22,7 +22,7 @@ class Transys {
 		transys_drop(ptr);
 	}
 
-	bool cube_subsume_init(std::vector<uint> cube)
+	bool cube_subsume_init(std::vector<uint> &cube)
 	{
 		return transys_cube_subsume_init(ptr, cube.data(), cube.size()) == 1;
 	}
