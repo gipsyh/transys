@@ -7,7 +7,7 @@ add_library(Transys STATIC transys.c)
 
 add_custom_target(
     libtransys
-    COMMAND cargo build --release
+    COMMAND cargo build --release --features no_bound_check
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../src/*.rs
 )

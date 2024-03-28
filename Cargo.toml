@@ -12,3 +12,6 @@ aig = { path = "../aig-rs" }
 minisat = { path = "../minisat-rs" }
 logic-form = { path = "../logic-form" }
 satif = { path = "../satif" }
+
+[features]
+no_bound_check = ["logic-form/no_bound_check"]
