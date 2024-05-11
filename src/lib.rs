@@ -1,5 +1,5 @@
 use aig::Aig;
-use logic_form::{Clause, Cnf, Cube, Lit, LitMap, Var, VarMap};
+use logic_form::{Cnf, Cube, Lit, LitMap, Var, VarMap};
 use minisat::SimpSolver;
 use std::{
     collections::{HashMap, HashSet},
@@ -108,7 +108,6 @@ impl Transys {
             init_map.insert(l.var(), l.polarity());
         }
         let constraints: Vec<Lit> = aig.constraints.iter().map(|c| c.to_lit()).collect();
-        assert!(constraints.is_empty());
         let aig_bad = if aig.bads.is_empty() {
             aig.outputs[0]
         } else {
@@ -135,9 +134,6 @@ impl Transys {
         for tran in trans.iter() {
             simp_solver.add_clause(tran);
         }
-        for c in constraints.iter() {
-            simp_solver.add_clause(&Clause::from([*c]));
-        }
         simp_solver.eliminate(true);
         let mut trans = simp_solver.clauses();
         let mut next_map = LitMap::new();
@@ -154,7 +150,6 @@ impl Transys {
             }
         }
         dependence = Self::compress_deps(dependence, &domain);
-
         for l in latchs.iter().chain(inputs.iter()) {
             domain.insert(*l);
         }
