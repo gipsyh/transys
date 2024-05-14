@@ -16,7 +16,7 @@ pub struct Transys {
     pub primes: Vec<Lit>,
     pub init: Cube,
     pub bad: Cube,
-    pub init_map: HashMap<Var, bool>,
+    pub init_map: VarMap<Option<bool>>,
     pub constraints: Vec<Lit>,
     pub trans: Cnf,
     pub num_var: usize,
@@ -166,9 +166,10 @@ impl Transys {
         let init = init.into_iter().map(map_lit).collect();
         let bad = bad.into_iter().map(map_lit).collect();
         let init_map = {
-            let mut new = HashMap::new();
+            let mut new = VarMap::new();
             for (k, v) in init_map.iter() {
-                new.insert(domain_map[k], *v);
+                new.reserve(domain_map[k]);
+                new[domain_map[k]] = Some(*v);
             }
             new
         };
@@ -224,8 +225,8 @@ impl Transys {
     #[inline]
     pub fn cube_subsume_init(&self, x: &[Lit]) -> bool {
         for x in x {
-            if let Some(init) = self.init_map.get(&x.var()) {
-                if *init != x.polarity() {
+            if let Some(init) = self.init_map[x.var()] {
+                if init != x.polarity() {
                     return false;
                 }
             }
@@ -235,10 +236,7 @@ impl Transys {
 
     #[inline]
     pub fn inits(&self) -> Vec<Cube> {
-        self.init_map
-            .iter()
-            .map(|(latch, init)| Cube::from([Lit::new(*latch, !init)]))
-            .collect()
+        self.init.iter().map(|l| Cube::from([!*l])).collect()
     }
 }
 
