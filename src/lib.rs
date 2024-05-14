@@ -167,8 +167,10 @@ impl Transys {
         let bad = bad.into_iter().map(map_lit).collect();
         let init_map = {
             let mut new = VarMap::new();
+            for l in latchs.iter() {
+                new.reserve(*l);
+            }
             for (k, v) in init_map.iter() {
-                new.reserve(domain_map[k]);
                 new[domain_map[k]] = Some(*v);
             }
             new
