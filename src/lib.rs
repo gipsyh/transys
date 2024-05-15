@@ -1,3 +1,6 @@
+mod unroll;
+pub use unroll::*;
+
 use aig::Aig;
 use logic_form::{Cnf, Cube, Lit, LitMap, Var, VarMap};
 use minisat::SimpSolver;
@@ -13,7 +16,6 @@ use std::{
 pub struct Transys {
     pub inputs: Vec<Var>,
     pub latchs: Vec<Var>,
-    pub primes: Vec<Lit>,
     pub init: Cube,
     pub bad: Cube,
     pub init_map: VarMap<Option<bool>>,
@@ -201,7 +203,6 @@ impl Transys {
         Self {
             inputs,
             latchs,
-            primes,
             init,
             bad,
             init_map,
