@@ -216,6 +216,32 @@ impl Transys {
     }
 
     #[inline]
+    pub fn new_var(&mut self) -> Var {
+        let var = Var(self.num_var as _);
+        self.num_var += 1;
+        self.init_map.reserve(var);
+        self.next_map.reserve(var);
+        self.dependence.reserve(var);
+        var
+    }
+
+    #[inline]
+    pub fn add_latch(&mut self, state: Var, next: Lit, init: Option<bool>, trans: Cnf) {
+        self.latchs.push(state);
+        for t in trans.iter() {
+            self.trans.push(t.clone());
+        }
+        let lit = state.lit();
+        self.next_map[lit] = next;
+        self.next_map[!lit] = !next;
+        self.init_map[state] = init;
+        if let Some(i) = init {
+            self.init.push(lit.not_if(!i));
+        }
+        self.max_latch = self.max_latch.max(state);
+    }
+
+    #[inline]
     pub fn lit_next(&self, lit: Lit) -> Lit {
         self.next_map[lit]
     }

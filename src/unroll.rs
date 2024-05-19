@@ -3,7 +3,7 @@ use logic_form::{Cube, Lit, LitMap, Var};
 use satif::Satif;
 
 pub struct TransysUnroll {
-    ts: Transys,
+    pub ts: Transys,
     num_unroll: usize,
     pub num_var: usize,
     next_map: LitMap<Vec<Lit>>,
