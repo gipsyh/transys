@@ -2,7 +2,7 @@ mod unroll;
 pub use unroll::*;
 
 use aig::Aig;
-use logic_form::{Cnf, Cube, Lit, LitMap, Var, VarMap};
+use logic_form::{Clause, Cnf, Cube, Lit, LitMap, Var, VarMap};
 use minisat::SimpSolver;
 use std::{
     collections::{HashMap, HashSet},
@@ -100,8 +100,8 @@ impl Transys {
             .latchs
             .iter()
             .map(|l| {
-                dependence.push(vec![]);
-                l.next.to_lit()
+                dependence.push(vec![l.next.to_lit().var()]);
+                simp_solver.new_var().lit()
             })
             .collect();
         let init = aig.latch_init_cube().to_cube();
@@ -129,7 +129,11 @@ impl Transys {
             logic.push(*c);
         }
         logic.push(aig_bad);
-        let trans = aig.get_cnf(&logic);
+        let mut trans = aig.get_cnf(&logic);
+        for i in 0..aig.latchs.len() {
+            trans.add_clause(Clause::from([!primes[i], aig.latchs[i].next.to_lit()]));
+            trans.add_clause(Clause::from([primes[i], !aig.latchs[i].next.to_lit()]));
+        }
         let bad_lit = aig_bad.to_lit();
         let bad = Cube::from([bad_lit]);
         simp_solver.set_frozen(bad_lit.var(), true);
@@ -226,7 +230,15 @@ impl Transys {
     }
 
     #[inline]
-    pub fn add_latch(&mut self, state: Var, next: Lit, init: Option<bool>, trans: Cnf) {
+    pub fn add_latch(
+        &mut self,
+        state: Var,
+        next: Lit,
+        init: Option<bool>,
+        trans: Cnf,
+        dep: Vec<Var>,
+        dep_next: Vec<Var>,
+    ) {
         self.latchs.push(state);
         for t in trans.iter() {
             self.trans.push(t.clone());
@@ -239,6 +251,8 @@ impl Transys {
             self.init.push(lit.not_if(!i));
         }
         self.max_latch = self.max_latch.max(state);
+        self.dependence[state] = dep;
+        self.dependence[next.var()] = dep_next;
     }
 
     #[inline]
