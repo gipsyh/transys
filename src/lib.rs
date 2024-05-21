@@ -25,6 +25,7 @@ pub struct Transys {
     next_map: LitMap<Lit>,
     pub dependence: VarMap<Vec<Var>>,
     pub max_latch: Var,
+    pub latch_group: VarMap<u32>,
 }
 
 impl Transys {
@@ -96,6 +97,18 @@ impl Transys {
         let inputs: Vec<Var> = aig.inputs.iter().map(|x| Var::new(*x)).collect();
         let latchs: Vec<Var> = aig.latchs.iter().map(|x| Var::new(x.input)).collect();
         let max_latch = *latchs.iter().max().unwrap();
+        let mut latch_group = VarMap::new();
+        latch_group.reserve(max_latch);
+        let mut num_group = aig.latch_group.len() as u32;
+        for l in aig.latchs.iter() {
+            latch_group[Var::new(l.input)] = match aig.latch_group.get(&l.input) {
+                Some(g) => *g,
+                None => {
+                    num_group += 1;
+                    num_group - 1
+                }
+            }
+        }
         let primes: Vec<Lit> = aig
             .latchs
             .iter()
@@ -167,6 +180,7 @@ impl Transys {
         }
         let map_lit = |l: Lit| Lit::new(domain_map[&l.var()], l.polarity());
         let inputs = inputs.into_iter().map(|v| domain_map[&v]).collect();
+        let old_latchs = latchs.clone();
         let latchs: Vec<Var> = latchs.into_iter().map(|v| domain_map[&v]).collect();
         let primes: Vec<Lit> = primes.into_iter().map(map_lit).collect();
         let init = init.into_iter().map(map_lit).collect();
@@ -204,6 +218,15 @@ impl Transys {
         };
         let max_latch = domain_map[&max_latch];
 
+        let latch_group = {
+            let mut new = VarMap::new();
+            new.reserve(max_latch);
+            for l in old_latchs.iter() {
+                new[domain_map[l]] = latch_group[*l];
+            }
+            new
+        };
+
         Self {
             inputs,
             latchs,
@@ -216,6 +239,7 @@ impl Transys {
             next_map,
             dependence,
             max_latch,
+            latch_group,
         }
     }
 
