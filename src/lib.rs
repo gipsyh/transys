@@ -12,7 +12,7 @@ use std::{
     usize,
 };
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct Transys {
     pub inputs: Vec<Var>,
     pub latchs: Vec<Var>,

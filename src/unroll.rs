@@ -1,5 +1,5 @@
 use crate::Transys;
-use logic_form::{Cube, Lit, LitMap, Var};
+use logic_form::{Clause, Cnf, Cube, Lit, LitMap, Var};
 use satif::Satif;
 
 pub struct TransysUnroll {
@@ -83,6 +83,60 @@ impl TransysUnroll {
                 let c = self.lit_next(*c, u);
                 satif.add_clause(&[c]);
             }
+        }
+    }
+
+    pub fn compile(&self) -> Transys {
+        let mut inputs = Vec::new();
+        let mut constraints = Vec::new();
+        let mut trans = Cnf::new();
+        for u in 0..=self.num_unroll {
+            for i in self.ts.inputs.iter() {
+                inputs.push(self.lit_next(i.lit(), u).var());
+            }
+            for c in self.ts.constraints.iter() {
+                let c = self.lit_next(*c, u);
+                constraints.push(c);
+            }
+            for c in self.ts.trans.iter() {
+                let c: Clause = c.iter().map(|l| self.lit_next(*l, u)).collect();
+                trans.push(c);
+            }
+        }
+        let mut next_map = self.ts.next_map.clone();
+        for l in self.ts.latchs.iter() {
+            let l = l.lit();
+            let n = self.lit_next(l, self.num_unroll);
+            next_map[l] = n;
+            next_map[!l] = !n;
+        }
+        let mut dependence = self.ts.dependence.clone();
+        dependence.reserve(Var::new(self.num_var));
+        for u in 1..=self.num_unroll {
+            for i in 0..self.ts.num_var {
+                let v = Var::new(i);
+                let n = self.lit_next(v.lit(), u).var();
+                if dependence[n].is_empty() {
+                    dependence[n] = dependence[v]
+                        .iter()
+                        .map(|l| self.lit_next(l.lit(), u).var())
+                        .collect()
+                }
+            }
+        }
+        Transys {
+            inputs,
+            latchs: self.ts.latchs.clone(),
+            init: self.ts.init.clone(),
+            bad: self.cube_next(&self.ts.bad, 1),
+            init_map: self.ts.init_map.clone(),
+            constraints,
+            trans,
+            num_var: self.num_var,
+            next_map,
+            dependence,
+            max_latch: self.ts.max_latch,
+            latch_group: self.ts.latch_group.clone(),
         }
     }
 }
