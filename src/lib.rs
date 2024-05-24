@@ -72,14 +72,7 @@ impl Transys {
     }
 
     pub fn from_aig(aig: &Aig) -> Self {
-        let aig_bad = if aig.bads.is_empty() {
-            aig.outputs[0]
-        } else {
-            aig.bads[0]
-        };
-        let mut refine_root = aig.constraints.clone();
-        refine_root.push(aig_bad);
-        let aig = aig.coi_refine(&refine_root);
+        let aig = aig.coi_refine();
         let mut simp_solver = SimpSolver::new();
         let false_lit: Lit = simp_solver.new_var().into();
         let mut dependence = VarMap::new();
