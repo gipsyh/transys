@@ -139,4 +139,47 @@ impl TransysUnroll {
             latch_group: self.ts.latch_group.clone(),
         }
     }
+
+    pub fn primed_constrains(&self) -> Transys {
+        assert!(self.num_unroll == 1);
+        let mut trans = Cnf::new();
+        for u in 0..=1 {
+            for c in self.ts.trans.iter() {
+                let c: Clause = c.iter().map(|l| self.lit_next(*l, u)).collect();
+                trans.push(c);
+            }
+        }
+        let mut dependence = self.ts.dependence.clone();
+        dependence.reserve(Var::new(self.num_var));
+        let mut next_map = self.ts.next_map.clone();
+        next_map.reserve(Var::new(self.num_var));
+        for c in self.ts.constraints.iter() {
+            next_map[*c] = self.lit_next(*c, 1);
+            next_map[!*c] = self.lit_next(!*c, 1);
+        }
+        for i in 0..self.ts.num_var {
+            let v = Var::new(i);
+            let n = self.lit_next(v.lit(), 1).var();
+            if dependence[n].is_empty() {
+                dependence[n] = dependence[v]
+                    .iter()
+                    .map(|l| self.lit_next(l.lit(), 1).var())
+                    .collect()
+            }
+        }
+        Transys {
+            inputs: self.ts.inputs.clone(),
+            latchs: self.ts.latchs.clone(),
+            init: self.ts.init.clone(),
+            bad: self.ts.bad.clone(),
+            init_map: self.ts.init_map.clone(),
+            constraints: self.ts.constraints.clone(),
+            trans,
+            num_var: self.num_var,
+            next_map,
+            dependence,
+            max_latch: self.ts.max_latch,
+            latch_group: self.ts.latch_group.clone(),
+        }
+    }
 }
