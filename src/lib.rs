@@ -299,10 +299,13 @@ impl Transys {
         self.init.iter().map(|l| Cube::from([!*l])).collect()
     }
 
-    pub fn get_coi(&self, var: Var) -> Vec<Var> {
+    pub fn get_coi(&self, var: impl Iterator<Item = Var>) -> Vec<Var> {
         let mut marked = HashSet::new();
-        marked.insert(var);
-        let mut queue = vec![var];
+        let mut queue = vec![];
+        for v in var {
+            marked.insert(v);
+            queue.push(v);
+        }
         while let Some(v) = queue.pop() {
             for d in self.dependence[v].iter() {
                 if !marked.contains(d) {
