@@ -298,6 +298,21 @@ impl Transys {
     pub fn inits(&self) -> Vec<Cube> {
         self.init.iter().map(|l| Cube::from([!*l])).collect()
     }
+
+    pub fn get_coi(&self, var: Var) -> Vec<Var> {
+        let mut marked = HashSet::new();
+        marked.insert(var);
+        let mut queue = vec![var];
+        while let Some(v) = queue.pop() {
+            for d in self.dependence[v].iter() {
+                if !marked.contains(d) {
+                    marked.insert(*d);
+                    queue.push(*d);
+                }
+            }
+        }
+        Vec::from_iter(marked.into_iter())
+    }
 }
 
 #[no_mangle]
