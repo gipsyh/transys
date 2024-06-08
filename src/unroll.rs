@@ -130,7 +130,7 @@ impl TransysUnroll {
             inputs,
             latchs: self.ts.latchs.clone(),
             init: self.ts.init.clone(),
-            bad: self.cube_next(&self.ts.bad, 1),
+            bad: self.lit_next(self.ts.bad, 1),
             init_map: self.ts.init_map.clone(),
             constraints,
             trans,

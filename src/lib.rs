@@ -17,7 +17,7 @@ pub struct Transys {
     pub inputs: Vec<Var>,
     pub latchs: Vec<Var>,
     pub init: Cube,
-    pub bad: Cube,
+    pub bad: Lit,
     pub init_map: VarMap<Option<bool>>,
     pub constraints: Vec<Lit>,
     pub trans: Cnf,
@@ -140,9 +140,8 @@ impl Transys {
             trans.add_clause(Clause::from([!primes[i], aig.latchs[i].next.to_lit()]));
             trans.add_clause(Clause::from([primes[i], !aig.latchs[i].next.to_lit()]));
         }
-        let bad_lit = aig_bad.to_lit();
-        let bad = Cube::from([bad_lit]);
-        simp_solver.set_frozen(bad_lit.var(), true);
+        let bad = aig_bad.to_lit();
+        simp_solver.set_frozen(bad.var(), true);
         for tran in trans.iter() {
             simp_solver.add_clause(tran);
         }
@@ -177,7 +176,7 @@ impl Transys {
         let latchs: Vec<Var> = latchs.into_iter().map(|v| domain_map[&v]).collect();
         let primes: Vec<Lit> = primes.into_iter().map(map_lit).collect();
         let init = init.into_iter().map(map_lit).collect();
-        let bad = bad.into_iter().map(map_lit).collect();
+        let bad = map_lit(bad);
         let init_map = {
             let mut new = VarMap::new();
             for l in latchs.iter() {
@@ -351,5 +350,5 @@ pub extern "C" fn transys_cube_subsume_init(
 #[no_mangle]
 pub extern "C" fn transys_lit_next(transys: *mut c_void, lit: c_uint) -> c_uint {
     let transys = unsafe { &*(transys as *const Transys) };
-    unsafe { transmute(transys.lit_next(transmute(lit))) }
+    unsafe { transmute(transys.lit_next(transmute::<u32, logic_form::Lit>(lit))) }
 }
