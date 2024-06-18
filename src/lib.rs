@@ -324,7 +324,7 @@ pub extern "C" fn transys_from_aig(aig: *const c_char) -> *mut c_void {
         let aig = CStr::from_ptr(aig);
         aig.to_string_lossy().into_owned()
     };
-    let transys = Box::new(Transys::from_aig(&Aig::from_file(aig).unwrap()));
+    let transys = Box::new(Transys::from_aig(&Aig::from_file(&aig)));
     let ptr = transys.as_ref() as *const Transys as *mut c_void;
     forget(transys);
     ptr
