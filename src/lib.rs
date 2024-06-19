@@ -23,6 +23,7 @@ pub struct Transys {
     pub trans: Cnf,
     pub num_var: usize,
     next_map: LitMap<Lit>,
+    prev_map: LitMap<Lit>,
     pub dependence: VarMap<Vec<Var>>,
     pub max_latch: Var,
     pub latch_group: VarMap<u32>,
@@ -193,11 +194,15 @@ impl Transys {
         }
         let num_var = domain.len();
         let mut next_map = LitMap::new();
+        let mut prev_map = LitMap::new();
         for (l, p) in latchs.iter().zip(primes.iter()) {
             next_map.reserve(*l);
+            prev_map.reserve(p.var());
             let l = l.lit();
             next_map[l] = *p;
             next_map[!l] = !*p;
+            prev_map[*p] = l;
+            prev_map[!*p] = !l;
         }
         let dependence = {
             let mut new = VarMap::new();
@@ -209,7 +214,6 @@ impl Transys {
             new
         };
         let max_latch = domain_map[&max_latch];
-
         let latch_group = {
             let mut new = VarMap::new();
             new.reserve(max_latch);
@@ -229,6 +233,7 @@ impl Transys {
             trans,
             num_var,
             next_map,
+            prev_map,
             dependence,
             max_latch,
             latch_group,
@@ -274,6 +279,11 @@ impl Transys {
     #[inline]
     pub fn lit_next(&self, lit: Lit) -> Lit {
         self.next_map[lit]
+    }
+
+    #[inline]
+    pub fn lit_prev(&self, lit: Lit) -> Lit {
+        self.prev_map[lit]
     }
 
     #[inline]
