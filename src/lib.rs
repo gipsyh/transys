@@ -311,11 +311,6 @@ impl Transys {
     }
 
     #[inline]
-    pub fn inits(&self) -> Vec<Cube> {
-        self.init.iter().map(|l| Cube::from([!*l])).collect()
-    }
-
-    #[inline]
     pub fn is_latch(&self, var: Var) -> bool {
         self.is_latch[var]
     }
