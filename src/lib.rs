@@ -1,4 +1,5 @@
 mod unroll;
+use satif::Satif;
 pub use unroll::*;
 
 use aig::Aig;
@@ -22,6 +23,7 @@ pub struct Transys {
     pub constraints: Vec<Lit>,
     pub trans: Cnf,
     pub num_var: usize,
+    is_latch: VarMap<bool>,
     next_map: LitMap<Lit>,
     prev_map: LitMap<Lit>,
     pub dependence: VarMap<Vec<Var>>,
@@ -222,7 +224,11 @@ impl Transys {
             }
             new
         };
-
+        let mut is_latch = VarMap::new();
+        is_latch.reserve(Var::new(num_var));
+        for l in latchs.iter() {
+            is_latch[*l] = true;
+        }
         Self {
             inputs,
             latchs,
@@ -232,6 +238,7 @@ impl Transys {
             constraints,
             trans,
             num_var,
+            is_latch,
             next_map,
             prev_map,
             dependence,
@@ -308,6 +315,11 @@ impl Transys {
         self.init.iter().map(|l| Cube::from([!*l])).collect()
     }
 
+    #[inline]
+    pub fn is_latch(&self, var: Var) -> bool {
+        self.is_latch[var]
+    }
+
     pub fn get_coi(&self, var: impl Iterator<Item = Var>) -> Vec<Var> {
         let mut marked = HashSet::new();
         let mut queue = vec![];
@@ -324,6 +336,15 @@ impl Transys {
             }
         }
         Vec::from_iter(marked.into_iter())
+    }
+
+    pub fn load_init(&mut self, satif: &mut impl Satif) {
+        while satif.num_var() < self.num_var {
+            satif.new_var();
+        }
+        for i in self.init.iter() {
+            satif.add_clause(&[*i]);
+        }
     }
 }
 

@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, ops::Range};
 
 use crate::Transys;
 use logic_form::{Clause, Cnf, Cube, Lit, LitMap, Var};
@@ -72,19 +72,23 @@ impl TransysUnroll {
         self.num_unroll += 1;
     }
 
-    pub fn load_trans(&self, satif: &mut impl Satif) {
+    pub fn unroll_to(&mut self, k: usize) {
+        while self.num_unroll < k {
+            self.unroll()
+        }
+    }
+
+    pub fn load_trans(&self, satif: &mut impl Satif, u: usize) {
         while satif.num_var() < self.num_var {
             satif.new_var();
         }
-        for u in 0..=self.num_unroll {
-            for c in self.ts.trans.iter() {
-                let c: Vec<Lit> = c.iter().map(|l| self.lit_next(*l, u)).collect();
-                satif.add_clause(&c);
-            }
-            for c in self.ts.constraints.iter() {
-                let c = self.lit_next(*c, u);
-                satif.add_clause(&[c]);
-            }
+        for c in self.ts.trans.iter() {
+            let c: Vec<Lit> = c.iter().map(|l| self.lit_next(*l, u)).collect();
+            satif.add_clause(&c);
+        }
+        for c in self.ts.constraints.iter() {
+            let c = self.lit_next(*c, u);
+            satif.add_clause(&[c]);
         }
     }
 
