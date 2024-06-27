@@ -3,7 +3,7 @@ use satif::Satif;
 pub use unroll::*;
 
 use aig::Aig;
-use logic_form::{Clause, Cnf, Cube, Lit, LitMap, Var, VarMap};
+use logic_form::{Clause, Cube, Lit, LitMap, Var, VarMap};
 use minisat::SimpSolver;
 use std::{
     collections::{HashMap, HashSet},
@@ -21,7 +21,7 @@ pub struct Transys {
     pub bad: Lit,
     pub init_map: VarMap<Option<bool>>,
     pub constraints: Vec<Lit>,
-    pub trans: Cnf,
+    pub trans: Vec<Clause>,
     pub num_var: usize,
     is_latch: VarMap<bool>,
     next_map: LitMap<Lit>,
@@ -140,8 +140,8 @@ impl Transys {
         logic.push(aig_bad);
         let mut trans = aig.get_cnf(&logic);
         for i in 0..aig.latchs.len() {
-            trans.add_clause(Clause::from([!primes[i], aig.latchs[i].next.to_lit()]));
-            trans.add_clause(Clause::from([primes[i], !aig.latchs[i].next.to_lit()]));
+            trans.push(Clause::from([!primes[i], aig.latchs[i].next.to_lit()]));
+            trans.push(Clause::from([primes[i], !aig.latchs[i].next.to_lit()]));
         }
         let bad = aig_bad.to_lit();
         simp_solver.set_frozen(bad.var(), true);
@@ -263,7 +263,7 @@ impl Transys {
         state: Var,
         next: Lit,
         init: Option<bool>,
-        trans: Cnf,
+        trans: Vec<Clause>,
         dep: Vec<Var>,
         dep_next: Vec<Var>,
     ) {

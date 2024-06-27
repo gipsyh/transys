@@ -1,7 +1,5 @@
-use std::{collections::HashSet, ops::Range};
-
 use crate::Transys;
-use logic_form::{Clause, Cnf, Cube, Lit, LitMap, Var};
+use logic_form::{Cube, Lit, LitMap, Var};
 use satif::Satif;
 
 pub struct TransysUnroll {
