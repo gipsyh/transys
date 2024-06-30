@@ -253,6 +253,8 @@ impl Transys {
         self.num_var += 1;
         self.init_map.reserve(var);
         self.next_map.reserve(var);
+        self.prev_map.reserve(var);
+        self.is_latch.reserve(var);
         self.dependence.reserve(var);
         var
     }
@@ -268,13 +270,16 @@ impl Transys {
         dep_next: Vec<Var>,
     ) {
         self.latchs.push(state);
-        for t in trans.iter() {
-            self.trans.push(t.clone());
+        for t in trans {
+            self.trans.push(t);
         }
         let lit = state.lit();
+        self.init_map[state] = init;
+        self.is_latch[state] = true;
         self.next_map[lit] = next;
         self.next_map[!lit] = !next;
-        self.init_map[state] = init;
+        self.prev_map[next] = lit;
+        self.prev_map[!next] = !lit;
         if let Some(i) = init {
             self.init.push(lit.not_if(!i));
         }
