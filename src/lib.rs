@@ -29,6 +29,7 @@ pub struct Transys {
     pub dependence: VarMap<Vec<Var>>,
     pub max_latch: Var,
     pub latch_group: VarMap<u32>,
+    pub groups: HashMap<u32, Vec<Var>>,
 }
 
 impl Transys {
@@ -216,11 +217,14 @@ impl Transys {
             new
         };
         let max_latch = domain_map[&max_latch];
+        let mut groups: HashMap<u32, Vec<Var>> = HashMap::new();
         let latch_group = {
             let mut new = VarMap::new();
             new.reserve(max_latch);
             for l in old_latchs.iter() {
                 new[domain_map[l]] = latch_group[*l];
+                let entry = groups.entry(latch_group[*l]).or_default();
+                entry.push(domain_map[l]);
             }
             new
         };
@@ -244,6 +248,7 @@ impl Transys {
             dependence,
             max_latch,
             latch_group,
+            groups,
         }
     }
 
