@@ -272,12 +272,9 @@ impl Transys {
         init: Option<bool>,
         trans: Vec<Clause>,
         dep: Vec<Var>,
-        dep_next: Vec<Var>,
     ) {
+        assert!(dep.iter().all(|v| self.is_latch(*v)));
         self.latchs.push(state);
-        for t in trans {
-            self.trans.push(t);
-        }
         let lit = state.lit();
         self.init_map[state] = init;
         self.is_latch[state] = true;
@@ -289,8 +286,11 @@ impl Transys {
             self.init.push(lit.not_if(!i));
         }
         self.max_latch = self.max_latch.max(state);
+        self.dependence[next.var()] = dep.iter().map(|v| self.next_map[v.lit()].var()).collect();
         self.dependence[state] = dep;
-        self.dependence[next.var()] = dep_next;
+        for t in trans {
+            self.trans.push(t);
+        }
     }
 
     #[inline]
