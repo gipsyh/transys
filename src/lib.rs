@@ -2,13 +2,14 @@ mod unroll;
 use satif::Satif;
 pub use unroll::*;
 
-use aig::Aig;
+use aig::{Aig, AigNodeId};
 use logic_form::{Clause, Cube, Lit, LitMap, Var, VarMap};
 use minisat::SimpSolver;
 use std::{
     collections::{HashMap, HashSet},
     ffi::{c_char, c_int, c_uint, c_void, CStr},
     mem::{forget, transmute},
+    ops::Deref,
     slice::from_raw_parts,
     usize,
 };
@@ -75,8 +76,8 @@ impl Transys {
         deps
     }
 
-    pub fn from_aig(aig: &Aig) -> Self {
-        let aig = aig.coi_refine();
+    pub fn from_aig(aig: &Aig) -> (Self, AigRestore) {
+        let (aig, remap) = aig.coi_refine();
         let mut simp_solver = SimpSolver::new();
         let false_lit: Lit = simp_solver.new_var().into();
         let mut dependence = VarMap::new();
@@ -233,23 +234,32 @@ impl Transys {
         for l in latchs.iter() {
             is_latch[*l] = true;
         }
-        Self {
-            inputs,
-            latchs,
-            init,
-            bad,
-            init_map,
-            constraints,
-            trans,
-            num_var,
-            is_latch,
-            next_map,
-            prev_map,
-            dependence,
-            max_latch,
-            latch_group,
-            groups,
+        let mut restore = HashMap::new();
+        for d in domain.iter() {
+            if let Some(r) = remap.get(&(**d as _)) {
+                restore.insert(domain_map[d], *r);
+            }
         }
+        (
+            Self {
+                inputs,
+                latchs,
+                init,
+                bad,
+                init_map,
+                constraints,
+                trans,
+                num_var,
+                is_latch,
+                next_map,
+                prev_map,
+                dependence,
+                max_latch,
+                latch_group,
+                groups,
+            },
+            AigRestore { restore },
+        )
     }
 
     #[inline]
@@ -353,6 +363,19 @@ impl Transys {
     }
 }
 
+#[derive(Debug)]
+pub struct AigRestore {
+    pub restore: HashMap<Var, AigNodeId>,
+}
+
+impl AigRestore {
+    #[inline]
+    pub fn restore(&self, lit: Lit) -> Lit {
+        let var = Var::new(self.restore[&lit.var()]);
+        Lit::new(var, lit.polarity())
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn transys_from_aig(aig: *const c_char) -> *mut c_void {
     assert!(!aig.is_null());
@@ -360,7 +383,7 @@ pub extern "C" fn transys_from_aig(aig: *const c_char) -> *mut c_void {
         let aig = CStr::from_ptr(aig);
         aig.to_string_lossy().into_owned()
     };
-    let transys = Box::new(Transys::from_aig(&Aig::from_file(&aig)));
+    let transys = Box::new(Transys::from_aig(&Aig::from_file(&aig)).0);
     let ptr = transys.as_ref() as *const Transys as *mut c_void;
     forget(transys);
     ptr
