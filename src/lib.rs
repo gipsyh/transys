@@ -9,7 +9,6 @@ use std::{
     collections::{HashMap, HashSet},
     ffi::{c_char, c_int, c_uint, c_void, CStr},
     mem::{forget, transmute},
-    ops::Deref,
     slice::from_raw_parts,
     usize,
 };
