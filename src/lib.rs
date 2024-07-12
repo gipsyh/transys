@@ -302,6 +302,14 @@ impl Transys {
         }
     }
 
+    pub fn add_init(&mut self, v: Var, init: Option<bool>) {
+        assert!(self.is_latch(v));
+        self.init_map[v] = init;
+        if let Some(i) = init {
+            self.init.push(v.lit().not_if(!i));
+        }
+    }
+
     #[inline]
     pub fn lit_next(&self, lit: Lit) -> Lit {
         self.next_map[lit]
