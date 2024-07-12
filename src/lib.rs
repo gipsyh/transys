@@ -360,6 +360,18 @@ impl Transys {
             satif.add_clause(&[*i]);
         }
     }
+
+    pub fn load_trans(&self, satif: &mut impl Satif) {
+        while satif.num_var() < self.num_var {
+            satif.new_var();
+        }
+        for c in self.trans.iter() {
+            satif.add_clause(c);
+        }
+        for c in self.constraints.iter() {
+            satif.add_clause(&[*c]);
+        }
+    }
 }
 
 #[derive(Debug)]
