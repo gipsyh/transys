@@ -1,8 +1,9 @@
 mod unroll;
+use abc::Abc;
 use satif::Satif;
 pub use unroll::*;
 
-use aig::{Aig, AigNodeId};
+use aig::{Aig, AigEdge, AigNodeId};
 use logic_form::{Clause, Cube, Lit, LitMap, Var, VarMap};
 use minisat::SimpSolver;
 use std::{
@@ -76,7 +77,22 @@ impl Transys {
     }
 
     pub fn from_aig(aig: &Aig) -> (Self, AigRestore) {
-        let (aig, remap) = aig.coi_refine();
+        let (aig, mut remap) = aig.coi_refine();
+
+        let mut remap_retain = HashSet::new();
+        remap_retain.insert(AigEdge::constant_edge(false).node_id());
+        for i in aig.inputs.iter() {
+            remap_retain.insert(*i);
+        }
+        for l in aig.latchs.iter() {
+            remap_retain.insert(l.input);
+        }
+        remap.retain(|x, _| remap_retain.contains(&x));
+        let mut abc = Abc::new();
+        abc.read_aig(&aig);
+        abc.execute_command("rewrite");
+        let aig = abc.write_aig();
+
         let mut simp_solver = SimpSolver::new();
         let false_lit: Lit = simp_solver.new_var().into();
         let mut dependence = VarMap::new();
