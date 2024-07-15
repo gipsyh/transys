@@ -90,7 +90,7 @@ impl Transys {
         remap.retain(|x, _| remap_retain.contains(&x));
         let mut abc = Abc::new();
         abc.read_aig(&aig);
-        abc.execute_command("rewrite");
+        abc.execute_command("rewrite; refactor");
         let aig = abc.write_aig();
 
         let mut simp_solver = SimpSolver::new();
