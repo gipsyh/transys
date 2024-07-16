@@ -3,7 +3,7 @@ use abc::Abc;
 use satif::Satif;
 pub use unroll::*;
 
-use aig::{Aig, AigEdge, AigNodeId};
+use aig::{Aig, AigEdge};
 use logic_form::{Clause, Cube, Lit, LitMap, Var, VarMap};
 use minisat::SimpSolver;
 use std::{
@@ -400,7 +400,7 @@ impl Transys {
 
 #[derive(Debug)]
 pub struct AigRestore {
-    pub restore: HashMap<Var, AigNodeId>,
+    pub restore: HashMap<Var, usize>,
 }
 
 impl AigRestore {
