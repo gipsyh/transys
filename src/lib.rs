@@ -91,7 +91,9 @@ impl Transys {
         let mut abc = Abc::new();
         abc.read_aig(&aig);
         abc.execute_command("rewrite; refactor");
-        let aig = abc.write_aig();
+        let mut aig = abc.write_aig();
+        aig.constraints
+            .retain(|e| *e != AigEdge::constant_edge(true));
 
         let mut simp_solver = SimpSolver::new();
         let false_lit: Lit = simp_solver.new_var().into();
