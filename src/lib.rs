@@ -378,7 +378,7 @@ impl Transys {
         Vec::from_iter(marked.into_iter())
     }
 
-    pub fn load_init(&mut self, satif: &mut impl Satif) {
+    pub fn load_init(&self, satif: &mut impl Satif) {
         while satif.num_var() < self.num_var {
             satif.new_var();
         }
