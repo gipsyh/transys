@@ -1,18 +1,18 @@
 mod unroll;
-use abc::Abc;
-use satif::Satif;
-pub use unroll::*;
 
+use abc::Abc;
 use aig::{Aig, AigEdge};
 use logic_form::{Clause, Cube, Lit, LitMap, Var, VarMap};
 use minisat::SimpSolver;
+use satif::Satif;
 use std::{
     collections::{HashMap, HashSet},
     ffi::{c_char, c_int, c_uint, c_void, CStr},
-    mem::{forget, transmute},
+    mem::{forget, take, transmute},
     slice::from_raw_parts,
     usize,
 };
+pub use unroll::*;
 
 #[derive(Clone, Default, Debug)]
 pub struct Transys {
@@ -76,6 +76,50 @@ impl Transys {
         deps
     }
 
+    pub fn abc_preprocess(mut aig: Aig) -> Aig {
+        let num_input = aig.inputs.len();
+        let num_latchs = aig.latchs.len();
+        let num_constraints = aig.constraints.len();
+        if aig.outputs.len() == 0 {
+            aig.outputs.push(aig.bads[0]);
+            aig.bads.clear();
+        }
+        let latchs = take(&mut aig.latchs);
+        for l in latchs.iter() {
+            aig.inputs.push(l.input);
+            aig.outputs.push(l.next);
+        }
+        for c in take(&mut aig.constraints) {
+            aig.outputs.push(c);
+        }
+        assert!(aig.inputs.len() == num_input + num_latchs);
+        assert!(aig.outputs.len() == 1 + num_latchs + num_constraints);
+        let mut abc = Abc::new();
+        abc.read_aig(&aig);
+        drop(aig);
+        abc.execute_command("&get; &fraig -x; &put; rewrite; refactor");
+        let mut abc_aig = abc.write_aig();
+        for i in 0..num_latchs {
+            let mut l = latchs[i];
+            l.input = abc_aig.inputs[num_input + i];
+            l.next = abc_aig.outputs[1 + i];
+            abc_aig.latchs.push(l);
+        }
+        abc_aig.inputs.truncate(num_input);
+        for i in 0..num_constraints {
+            abc_aig
+                .constraints
+                .push(abc_aig.outputs[1 + num_latchs + i]);
+        }
+        abc_aig.outputs.truncate(1);
+
+        assert!(abc_aig.inputs.len() == num_input);
+        assert!(abc_aig.latchs.len() == num_latchs);
+        assert!(abc_aig.constraints.len() == num_constraints);
+
+        abc_aig
+    }
+
     pub fn from_aig(aig: &Aig) -> (Self, AigRestore) {
         let (aig, mut remap) = aig.coi_refine();
 
@@ -88,10 +132,7 @@ impl Transys {
             remap_retain.insert(l.input);
         }
         remap.retain(|x, _| remap_retain.contains(&x));
-        let mut abc = Abc::new();
-        abc.read_aig(&aig);
-        abc.execute_command("rewrite; refactor");
-        let mut aig = abc.write_aig();
+        let mut aig = Self::abc_preprocess(aig);
         aig.constraints
             .retain(|e| *e != AigEdge::constant_edge(true));
 
