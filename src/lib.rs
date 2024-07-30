@@ -120,7 +120,7 @@ impl Transys {
         abc_aig
     }
 
-    pub fn from_aig(aig: &Aig) -> (Self, AigRestore) {
+    pub fn from_aig(aig: &Aig, strengthen: bool) -> (Self, AigRestore) {
         let (aig, mut remap) = aig.coi_refine();
 
         let mut remap_retain = HashSet::new();
@@ -136,7 +136,11 @@ impl Transys {
         aig.constraints
             .retain(|e| *e != AigEdge::constant_edge(true));
 
-        let mut simp_solver = SimpSolver::new();
+        let mut simp_solver: Box<dyn Satif> = if strengthen {
+            Box::new(cadical::Solver::new())
+        } else {
+            Box::new(SimpSolver::new())
+        };
         let false_lit: Lit = simp_solver.new_var().into();
         let mut dependence = VarMap::new();
         dependence.push(vec![]);
@@ -208,7 +212,7 @@ impl Transys {
         for tran in trans.iter() {
             simp_solver.add_clause(tran);
         }
-        simp_solver.eliminate(true);
+        simp_solver.simplify();
         let mut trans = simp_solver.clauses();
         let mut next_map = LitMap::new();
         for (l, p) in latchs.iter().zip(primes.iter()) {
@@ -461,7 +465,7 @@ pub extern "C" fn transys_from_aig(aig: *const c_char) -> *mut c_void {
         let aig = CStr::from_ptr(aig);
         aig.to_string_lossy().into_owned()
     };
-    let transys = Box::new(Transys::from_aig(&Aig::from_file(&aig)).0);
+    let transys = Box::new(Transys::from_aig(&Aig::from_file(&aig), false).0);
     let ptr = transys.as_ref() as *const Transys as *mut c_void;
     forget(transys);
     ptr

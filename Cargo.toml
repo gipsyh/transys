@@ -13,6 +13,7 @@ minisat = { path = "../minisat-rs" }
 logic-form = { path = "../logic-form" }
 satif = { path = "../satif" }
 abc = { path = "../abc-rs" }
+cadical = { path = "../cadical-rs" }
 
 [features]
 no_bound_check = ["logic-form/no_bound_check"]
