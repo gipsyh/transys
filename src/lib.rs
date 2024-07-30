@@ -21,7 +21,7 @@ pub struct Transys {
     pub init: Cube,
     pub bad: Lit,
     pub init_map: VarMap<Option<bool>>,
-    pub constraints: Vec<Lit>,
+    pub constraints: Cube,
     pub trans: Vec<Clause>,
     pub num_var: usize,
     is_latch: VarMap<bool>,
