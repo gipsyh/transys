@@ -1,87 +1,46 @@
-use aig::Aig;
-use logic_form::{Clause, Cnf, Cube, Lit, LitMap, Var, VarMap};
-use minisat::SimpSolver;
-use std::{
-    collections::{HashMap, HashSet},
-    ffi::{c_char, c_int, c_uint, c_void, CStr},
-    mem::{forget, transmute},
-    slice::from_raw_parts,
-    usize,
-};
+mod cif;
+pub mod simplify;
 
-#[derive(Clone, Default)]
+use aig::Aig;
+use logic_form::{Clause, Cube, Lit, LitMap, Var, VarMap};
+use satif::Satif;
+use std::collections::{HashMap, HashSet};
+
+#[derive(Clone, Default, Debug)]
 pub struct Transys {
     pub inputs: Vec<Var>,
     pub latchs: Vec<Var>,
-    pub primes: Vec<Lit>,
     pub init: Cube,
-    pub bad: Cube,
-    pub init_map: HashMap<Var, bool>,
-    pub constraints: Vec<Lit>,
-    pub trans: Cnf,
-    pub num_var: usize,
+    pub bad: Lit,
+    pub init_map: VarMap<Option<bool>>,
+    pub constraints: Cube,
+    pub trans: Vec<Clause>,
+    pub max_var: Var,
+    is_latch: VarMap<bool>,
     next_map: LitMap<Lit>,
+    prev_map: LitMap<Lit>,
     pub dependence: VarMap<Vec<Var>>,
     pub max_latch: Var,
+    restore: HashMap<Var, Var>,
 }
 
 impl Transys {
-    fn compress_deps_rec(
-        v: Var,
-        deps: &mut VarMap<Vec<Var>>,
-        domain: &HashSet<Var>,
-        compressed: &mut HashSet<Var>,
-    ) {
-        if compressed.contains(&v) {
-            return;
-        }
-        for d in 0..deps[v].len() {
-            Self::compress_deps_rec(deps[v][d], deps, domain, compressed);
-        }
-        let mut dep = HashSet::new();
-        for d in deps[v].iter() {
-            if domain.contains(d) {
-                dep.insert(*d);
-                continue;
-            }
-            for dd in deps[*d].iter() {
-                dep.insert(*dd);
-            }
-        }
-        deps[v] = dep.into_iter().collect();
-        deps[v].sort();
-        compressed.insert(v);
+    #[inline]
+    pub fn num_var(&self) -> usize {
+        Into::<usize>::into(self.max_var) + 1
     }
 
-    fn compress_deps(mut deps: VarMap<Vec<Var>>, cnf: &Cnf) -> VarMap<Vec<Var>> {
-        let mut domain = HashSet::new();
-        for cls in cnf.iter() {
-            for l in cls.iter() {
-                domain.insert(l.var());
-            }
-        }
-        let mut compressed: HashSet<Var> = HashSet::new();
-        for v in 0..deps.len() {
-            let v = Var::new(v);
-            Self::compress_deps_rec(v, &mut deps, &domain, &mut compressed)
-        }
-        for v in 0..deps.len() {
-            let v = Var::new(v);
-            if !domain.contains(&v) {
-                deps[v].clear();
-            }
-        }
-        deps
-    }
-
-    pub fn from_aig(aig: &Aig) -> Self {
-        let mut simp_solver = SimpSolver::new();
-        let false_lit: Lit = simp_solver.new_var().into();
+    pub fn from_aig(aig: &Aig, rst: &HashMap<usize, usize>) -> Self {
+        let false_lit: Lit = Lit::constant(false);
+        let mut max_var = false_lit.var();
+        let mut new_var = || {
+            max_var += 1;
+            max_var
+        };
         let mut dependence = VarMap::new();
         dependence.push(vec![]);
-        simp_solver.add_clause(&[!false_lit]);
         for node in aig.nodes.iter().skip(1) {
-            assert_eq!(Var::new(node.node_id()), simp_solver.new_var());
+            assert_eq!(Var::new(node.node_id()), new_var());
             let mut dep = Vec::new();
             if node.is_and() {
                 dep.push(node.fanin0().to_lit().var());
@@ -91,76 +50,124 @@ impl Transys {
         }
         let inputs: Vec<Var> = aig.inputs.iter().map(|x| Var::new(*x)).collect();
         let latchs: Vec<Var> = aig.latchs.iter().map(|x| Var::new(x.input)).collect();
-        let max_latch = *latchs.iter().max().unwrap();
+        let max_latch = *latchs.iter().max().unwrap_or(&Var::new(0));
         let primes: Vec<Lit> = aig
             .latchs
             .iter()
             .map(|l| {
-                dependence.push(vec![]);
-                l.next.to_lit()
+                dependence.push(vec![l.next.to_lit().var()]);
+                new_var().lit().not_if(!l.next.to_lit().polarity())
             })
             .collect();
-        let init = aig.latch_init_cube().to_cube();
-        let mut init_map = HashMap::new();
+        let init = aig.latch_init_cube();
+        let mut init_map = VarMap::new();
+        init_map.reserve(max_latch);
         for l in init.iter() {
-            init_map.insert(l.var(), l.polarity());
+            init_map[l.var()] = Some(l.polarity());
         }
-        let constraints: Vec<Lit> = aig.constraints.iter().map(|c| c.to_lit()).collect();
-        assert!(constraints.is_empty());
-        let aig_bad = if aig.bads.is_empty() {
-            aig.outputs[0]
-        } else {
-            aig.bads[0]
-        };
-        for v in inputs.iter().chain(latchs.iter()) {
-            simp_solver.set_frozen(*v, true);
-        }
-        for l in constraints.iter().chain(primes.iter()) {
-            simp_solver.set_frozen(l.var(), true);
-        }
-        let mut logic = Vec::new();
-        for l in aig.latchs.iter() {
-            logic.push(l.next);
-        }
-        for c in aig.constraints.iter() {
-            logic.push(*c);
-        }
-        logic.push(aig_bad);
-        let trans = aig.get_cnf(&logic);
-        let bad_lit = aig_bad.to_lit();
-        let bad = Cube::from([bad_lit]);
-        simp_solver.set_frozen(bad_lit.var(), true);
-        for tran in trans.iter() {
-            simp_solver.add_clause(tran);
-        }
-        for c in constraints.iter() {
-            simp_solver.add_clause(&Clause::from([*c]));
-        }
-        simp_solver.eliminate(true);
-        let num_var = simp_solver.num_var();
-        let trans = simp_solver.clauses();
+        let constraints: Cube = aig.constraints.iter().map(|c| c.to_lit()).collect();
+        let aig_bad = aig.bads[0];
         let mut next_map = LitMap::new();
+        let mut prev_map = LitMap::new();
         for (l, p) in latchs.iter().zip(primes.iter()) {
             next_map.reserve(*l);
+            prev_map.reserve(p.var());
             let l = l.lit();
             next_map[l] = *p;
             next_map[!l] = !*p;
+            prev_map[*p] = l;
+            prev_map[!*p] = !l;
         }
-        dependence = Self::compress_deps(dependence, &trans);
+        let mut trans = aig.get_cnf();
+        for (i, pi) in primes.iter().enumerate() {
+            trans.push(Clause::from([!*pi, aig.latchs[i].next.to_lit()]));
+            trans.push(Clause::from([*pi, !aig.latchs[i].next.to_lit()]));
+        }
+        let bad = aig_bad.to_lit();
+        let mut is_latch = VarMap::new_with(max_var);
+        for l in latchs.iter() {
+            is_latch[*l] = true;
+        }
+        let mut restore = HashMap::new();
+        for (d, v) in rst.iter() {
+            restore.insert(Var::new(*d), Var::new(*v));
+        }
+        for (i, pi) in primes.iter().enumerate() {
+            let n = aig.latchs[i].next.to_lit();
+            assert!(pi.polarity() == n.polarity());
+            if let Some(r) = restore.get(&n.var()) {
+                restore.insert(pi.var(), *r);
+            }
+        }
         Self {
             inputs,
             latchs,
-            primes,
             init,
             bad,
             init_map,
             constraints,
             trans,
-            num_var,
+            max_var,
+            is_latch,
             next_map,
+            prev_map,
             dependence,
             max_latch,
+            restore,
         }
+    }
+
+    #[inline]
+    pub fn new_var(&mut self) -> Var {
+        self.max_var += 1;
+        self.init_map.reserve(self.max_var);
+        self.next_map.reserve(self.max_var);
+        self.prev_map.reserve(self.max_var);
+        self.is_latch.reserve(self.max_var);
+        self.dependence.reserve(self.max_var);
+        self.max_var
+    }
+
+    #[inline]
+    pub fn add_latch(
+        &mut self,
+        state: Var,
+        next: Lit,
+        init: Option<bool>,
+        trans: Vec<Clause>,
+        dep: Vec<Var>,
+    ) {
+        assert!(dep.iter().all(|v| self.is_latch(*v)));
+        self.latchs.push(state);
+        let lit = state.lit();
+        self.init_map[state] = init;
+        self.is_latch[state] = true;
+        self.next_map[lit] = next;
+        self.next_map[!lit] = !next;
+        self.prev_map[next] = lit;
+        self.prev_map[!next] = !lit;
+        if let Some(i) = init {
+            self.init.push(lit.not_if(!i));
+        }
+        self.max_latch = self.max_latch.max(state);
+        self.dependence[next.var()] = dep.iter().map(|v| self.next_map[v.lit()].var()).collect();
+        self.dependence[state] = dep;
+        for t in trans {
+            self.trans.push(t);
+        }
+    }
+
+    pub fn add_init(&mut self, v: Var, init: Option<bool>) {
+        assert!(self.is_latch(v));
+        self.init_map[v] = init;
+        if let Some(i) = init {
+            self.init.push(v.lit().not_if(!i));
+        }
+    }
+
+    #[inline]
+    pub fn var_next(&self, var: Var) -> Var {
+        self.next_map[var.lit()].var()
     }
 
     #[inline]
@@ -169,15 +176,25 @@ impl Transys {
     }
 
     #[inline]
+    pub fn lit_prev(&self, lit: Lit) -> Lit {
+        self.prev_map[lit]
+    }
+
+    #[inline]
     pub fn cube_next(&self, cube: &[Lit]) -> Cube {
         cube.iter().map(|l| self.lit_next(*l)).collect()
     }
 
     #[inline]
+    pub fn cube_prev(&self, cube: &[Lit]) -> Cube {
+        cube.iter().map(|l| self.lit_prev(*l)).collect()
+    }
+
+    #[inline]
     pub fn cube_subsume_init(&self, x: &[Lit]) -> bool {
         for x in x {
-            if let Some(init) = self.init_map.get(&x.var()) {
-                if *init != x.polarity() {
+            if let Some(init) = self.init_map[x.var()] {
+                if init != x.polarity() {
                     return false;
                 }
             }
@@ -186,46 +203,58 @@ impl Transys {
     }
 
     #[inline]
-    pub fn inits(&self) -> Vec<Cube> {
-        self.init_map
-            .iter()
-            .map(|(latch, init)| Cube::from([Lit::new(*latch, !init)]))
-            .collect()
+    pub fn is_latch(&self, var: Var) -> bool {
+        self.is_latch[var]
     }
-}
 
-#[no_mangle]
-pub extern "C" fn transys_from_aig(aig: *const c_char) -> *mut c_void {
-    assert!(!aig.is_null());
-    let aig = unsafe {
-        let aig = CStr::from_ptr(aig);
-        aig.to_string_lossy().into_owned()
-    };
-    let transys = Box::new(Transys::from_aig(&Aig::from_file(aig).unwrap()));
-    let ptr = transys.as_ref() as *const Transys as *mut c_void;
-    forget(transys);
-    ptr
-}
+    #[allow(unused)]
+    pub fn get_coi(&self, var: impl Iterator<Item = Var>) -> Vec<Var> {
+        let mut marked = HashSet::new();
+        let mut queue = vec![];
+        for v in var {
+            marked.insert(v);
+            queue.push(v);
+        }
+        while let Some(v) = queue.pop() {
+            for d in self.dependence[v].iter() {
+                if !marked.contains(d) {
+                    marked.insert(*d);
+                    queue.push(*d);
+                }
+            }
+        }
+        Vec::from_iter(marked)
+    }
 
-#[no_mangle]
-pub extern "C" fn transys_drop(transys: *mut c_void) {
-    let transys: Box<Transys> = unsafe { Box::from_raw(transys as *mut _) };
-    drop(transys)
-}
+    pub fn load_init<S: Satif + ?Sized>(&self, satif: &mut S) {
+        satif.new_var_to(self.max_var);
+        for i in self.init.iter() {
+            satif.add_clause(&[*i]);
+        }
+    }
 
-#[no_mangle]
-pub extern "C" fn transys_cube_subsume_init(
-    transys: *mut c_void,
-    lit_ptr: *const Lit,
-    lit_len: u32,
-) -> c_int {
-    let transys = unsafe { &*(transys as *const Transys) };
-    let cube = unsafe { from_raw_parts(lit_ptr, lit_len as _) };
-    transys.cube_subsume_init(cube) as c_int
-}
+    pub fn load_trans(&self, satif: &mut impl Satif, constrain: bool) {
+        satif.new_var_to(self.max_var);
+        for c in self.trans.iter() {
+            satif.add_clause(c);
+        }
+        if constrain {
+            for c in self.constraints.iter() {
+                satif.add_clause(&[*c]);
+            }
+        }
+    }
 
-#[no_mangle]
-pub extern "C" fn transys_lit_next(transys: *mut c_void, lit: c_uint) -> c_uint {
-    let transys = unsafe { &*(transys as *const Transys) };
-    unsafe { transmute(transys.lit_next(transmute(lit))) }
+    #[inline]
+    pub fn restore(&self, lit: Lit) -> Lit {
+        let var = self.restore[&lit.var()];
+        Lit::new(var, lit.polarity())
+    }
+
+    pub fn print_info(&self) {
+        println!("num input: {}", self.inputs.len());
+        println!("num latch: {}", self.latchs.len());
+        println!("trans size: {}", self.trans.len());
+        println!("num constraint: {}", self.constraints.len());
+    }
 }

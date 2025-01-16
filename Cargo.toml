@@ -9,7 +9,8 @@ crate-type = ["staticlib", "rlib"]
 
 [dependencies]
 aig = { path = "../aig-rs" }
-minisat = { path = "../minisat-rs" }
+satif-minisat = { path = "../minisat-rs" }
+satif-cadical = { path = "../cadical-rs" }
 logic-form = { path = "../logic-form" }
 satif = { path = "../satif" }
 
