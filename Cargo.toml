@@ -8,11 +8,11 @@ name = "transys"
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
-aig = { path = "../aig-rs" }
-satif-minisat = { path = "../minisat-rs" }
-satif-cadical = { path = "../cadical-rs" }
-logic-form = { path = "../logic-form" }
-satif = { path = "../satif" }
+aig = "=0.2.6"
+satif-minisat = "=0.2.4"
+satif-cadical = "=0.1.4"
+logic-form = "=0.2.9"
+satif = "=0.1.3"
 
 [features]
 no_bound_check = ["logic-form/no_bound_check"]
